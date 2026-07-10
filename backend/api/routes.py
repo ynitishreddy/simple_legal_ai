@@ -191,6 +191,7 @@ def get_case_timeline(
             "citation": case.case_citation,
             "court": case.court_name,
             "status": case.status.value,
+            "raw_text": case.raw_text,
         },
         "nodes": nodes,
         "edges": edges,
