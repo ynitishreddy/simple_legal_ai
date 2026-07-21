@@ -112,6 +112,20 @@ class Case(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow
     )
+    
+    # Ingestion tracking
+    progress_step: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    status_message: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    # Extracted legal profile metadata
+    petitioner: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    respondent: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    judges: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    judgment_date: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    case_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    acts: Mapped[str | None] = mapped_column(Text, nullable=True)
+    articles: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sections: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # ── Relationships ─────────────────────────────────────────────────────────
     events: Mapped[list["Event"]] = relationship(

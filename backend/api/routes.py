@@ -41,6 +41,103 @@ def trigger_background_nlp_pipeline():
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
+@router.post("/cases/analyze-file")
+async def analyze_file(
+    file: UploadFile,
+):
+    """
+    Analyzes an uploaded file (PDF, TXT, or JSON).
+    Detects file type, extracts readable text (using OCR fallback if PDF is scanned),
+    extracts metadata using NLP, and returns the parsed results for review.
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Invalid file upload (missing filename).")
+
+    file_name = file.filename
+    file_size = 0
+    ocr_run = False
+    page_count = 0
+    extracted_text = ""
+    
+    try:
+        bytes_content = await file.read()
+        file_size = len(bytes_content)
+        
+        # 1. Detect file type and extract text
+        if file_name.lower().endswith(".pdf"):
+            from nlp.pdf_parser import extract_text_from_pdf
+            extracted_text, ocr_run, page_count = extract_text_from_pdf(bytes_content, file_name)
+        elif file_name.lower().endswith(".json"):
+            try:
+                data = json.loads(bytes_content.decode("utf-8"))
+                if isinstance(data, dict):
+                    extracted_text = data.get("text", data.get("raw_text", ""))
+                    metadata_defaults = {
+                        "case_name": data.get("case_name", data.get("case_citation", "")),
+                        "court_name": data.get("court_name", ""),
+                        "citation": data.get("case_citation", ""),
+                        "petitioner": data.get("petitioner", ""),
+                        "respondent": data.get("respondent", ""),
+                        "judges": data.get("judges", ""),
+                        "judgment_date": data.get("judgment_date", ""),
+                        "case_number": data.get("case_number", ""),
+                        "acts": data.get("acts", ""),
+                        "articles": data.get("articles", ""),
+                        "sections": data.get("sections", "")
+                    }
+                    if not extracted_text:
+                        extracted_text = bytes_content.decode("utf-8")
+                else:
+                    extracted_text = bytes_content.decode("utf-8")
+                    metadata_defaults = {}
+            except Exception as json_err:
+                logger.warning("Failed to parse JSON file: %s", json_err)
+                extracted_text = bytes_content.decode("utf-8")
+                metadata_defaults = {}
+            page_count = 1
+        else:
+            extracted_text = bytes_content.decode("utf-8")
+            page_count = 1
+            metadata_defaults = {}
+
+        if not extracted_text.strip():
+            raise ValueError("File content is empty or unextractable.")
+            
+        # 2. Extract metadata
+        from nlp.metadata_extractor import extract_metadata
+        extracted_metadata = extract_metadata(extracted_text)
+        
+        # Merge defaults from JSON if present
+        if file_name.lower().endswith(".json") and metadata_defaults:
+            for k, v in metadata_defaults.items():
+                if v and not extracted_metadata.get(k):
+                    extracted_metadata[k] = v
+
+        # Set fallbacks if citation or court is empty
+        if not extracted_metadata.get("citation"):
+            extracted_metadata["citation"] = file_name.rsplit(".", 1)[0]
+        if not extracted_metadata.get("case_name"):
+            extracted_metadata["case_name"] = extracted_metadata["citation"]
+        if not extracted_metadata.get("court_name"):
+            extracted_metadata["court_name"] = "Generic Court"
+
+        return {
+            "file_name": file_name,
+            "file_size": file_size,
+            "page_count": page_count,
+            "ocr_run": ocr_run,
+            "extracted_text": extracted_text,
+            "metadata": extracted_metadata
+        }
+
+    except Exception as e:
+        logger.error("File analysis failed: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=400,
+            detail=f"Document parsing failed: {str(e)}"
+        )
+
+
 @router.post("/cases/upload")
 async def upload_case(
     background_tasks: BackgroundTasks,
@@ -48,6 +145,14 @@ async def upload_case(
     case_citation: Optional[str] = Form(None),
     court_name: Optional[str] = Form(None),
     raw_text: Optional[str] = Form(None),
+    petitioner: Optional[str] = Form(None),
+    respondent: Optional[str] = Form(None),
+    judges: Optional[str] = Form(None),
+    judgment_date: Optional[str] = Form(None),
+    case_number: Optional[str] = Form(None),
+    acts: Optional[str] = Form(None),
+    articles: Optional[str] = Form(None),
+    sections: Optional[str] = Form(None),
     db: Session = Depends(get_db),
 ):
     """
@@ -97,6 +202,14 @@ async def upload_case(
         court_name=court,
         raw_text=content,
         status=CaseStatus.PENDING,
+        petitioner=petitioner,
+        respondent=respondent,
+        judges=judges,
+        judgment_date=judgment_date,
+        case_number=case_number,
+        acts=acts,
+        articles=articles,
+        sections=sections,
     )
     db.add(case)
     db.commit()
@@ -143,12 +256,16 @@ def get_case_status(
     db: Session = Depends(get_db),
 ):
     """
-    Returns the execution status of a specific case.
+    Returns the execution status of a specific case, including active step info.
     """
     case = db.query(Case).filter(Case.id == case_id).one_or_none()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found.")
-    return {"status": case.status.value}
+    return {
+        "status": case.status.value,
+        "progress_step": case.progress_step,
+        "status_message": case.status_message,
+    }
 
 
 @router.get("/cases/{case_id}/timeline")
@@ -192,6 +309,14 @@ def get_case_timeline(
             "court": case.court_name,
             "status": case.status.value,
             "raw_text": case.raw_text,
+            "petitioner": case.petitioner,
+            "respondent": case.respondent,
+            "judges": case.judges,
+            "judgment_date": case.judgment_date,
+            "case_number": case.case_number,
+            "acts": case.acts,
+            "articles": case.articles,
+            "sections": case.sections,
         },
         "nodes": nodes,
         "edges": edges,

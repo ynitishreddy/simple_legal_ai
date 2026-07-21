@@ -63,6 +63,17 @@ def run_nlp_pipeline(session_factory=None) -> dict:
 
         for case in pending:
             try:
+                # Update status to PROCESSING
+                case.status = CaseStatus.PROCESSING
+                case.progress_step = "NLP_START"
+                case.status_message = "Initializing NLP engine..."
+                db.commit()
+
+                # Start extraction
+                case.progress_step = "EXTRACTING_ENTITIES"
+                case.status_message = "Extracting temporal anchors and event triggers..."
+                db.commit()
+
                 raw_events = extractor.extract(case.raw_text or "")
 
                 # Persist each extracted event
@@ -90,9 +101,18 @@ def run_nlp_pipeline(session_factory=None) -> dict:
                 db.flush()
 
                 # Build the temporal event graph
+                case.progress_step = "BUILDING_TIMELINE"
+                case.status_message = "Resolving temporal relationships and building timeline..."
+                db.commit()
+
                 from graph.builder import GraphBuilder
                 builder = GraphBuilder()
                 builder.build_case_graph(case.id, db)
+
+                case.status = CaseStatus.COMPLETED
+                case.progress_step = "SUCCESS"
+                case.status_message = "Case analysis and graph construction complete."
+                db.commit()
 
                 cases_processed += 1
                 logger.info(
@@ -106,6 +126,9 @@ def run_nlp_pipeline(session_factory=None) -> dict:
                     "  [FAIL] %s — %s", case.case_citation, exc, exc_info=True
                 )
                 case.status = CaseStatus.FAILED
+                case.progress_step = "FAILED"
+                case.status_message = f"Error: {str(exc)}"
+                db.commit()
                 cases_failed.append(case.case_citation)
 
         db.commit()
