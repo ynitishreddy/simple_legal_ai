@@ -1085,12 +1085,12 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="flex-1 flex flex-col md:flex-row gap-6 min-h-0 overflow-hidden">
+                {/* Workspace Panels */}
+                <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start min-h-0 overflow-hidden">
                   <div
                     className={`h-full transition-all duration-300 ease-out ${
                       renderedWorkspaceMode === 'graph' ? 'overflow-hidden' : 'overflow-y-auto pr-2'
-                    } ${workspaceSwitching ? 'opacity-0' : 'opacity-100'}`}
-                    style={{ width: isFocusMode ? '100%' : '75%' }}
+                    } ${workspaceSwitching ? 'opacity-0' : 'opacity-100'} ${isFocusMode ? 'lg:col-span-12' : 'lg:col-span-8'}`}
                   >
                     {renderedWorkspaceMode === 'graph' ? (
                       <NetworkGraphCanvas
@@ -1215,8 +1215,10 @@ export default function App() {
 
                   {!isFocusMode && (
                     <div 
-                      className={`w-[25%] flex flex-col h-full border p-4 transition-all duration-300 ease-out rounded-lg text-left overflow-y-auto ${
-                        theme === 'midnight' ? 'border-[#1F232D] bg-[#0D0F14]' : 'border-[#CBBFA0] bg-[#FAF7F0]'
+                      className={`p-4 transition-all duration-300 ease-out text-left lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto space-y-4 shadow-xl border rounded-xl backdrop-blur ${isFocusMode ? 'hidden' : 'block lg:col-span-4'} ${
+                        theme === 'midnight'
+                          ? 'border-slate-700/50 bg-slate-900/90'
+                          : 'border-slate-350 bg-white/90 shadow-md'
                       }`}
                     >
                       <div className="flex justify-between items-center border-b pb-2 mb-4 border-slate-200 dark:border-[#1F232D]">
@@ -2287,12 +2289,11 @@ export default function App() {
                           </div>
 
                           {/* Workspace Panels */}
-                          <div className="flex-1 flex flex-col md:flex-row gap-6 min-h-0 overflow-hidden">
+                          <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start min-h-0 overflow-hidden">
                             <div
                               className={`h-full transition-all duration-300 ease-out ${
                                 renderedWorkspaceMode === 'graph' ? 'overflow-hidden' : 'overflow-y-auto pr-2'
-                              } ${workspaceSwitching ? 'opacity-0' : 'opacity-100'}`}
-                              style={{ width: isFocusMode ? '100%' : '75%' }}
+                              } ${workspaceSwitching ? 'opacity-0' : 'opacity-100'} ${isFocusMode ? 'lg:col-span-12' : 'lg:col-span-8'}`}
                             >
                               {renderedWorkspaceMode === 'graph' ? (
                                 <NetworkGraphCanvas
@@ -2469,8 +2470,7 @@ export default function App() {
                             </div>
 
                             <div
-                              className={`border p-5 md:p-6 flex flex-col justify-between overflow-y-auto transition-all duration-300 ease-out flex-shrink-0 self-start sticky top-[152px] max-h-[calc(100vh-176px)] ${isFocusMode ? 'hidden' : 'block'} ${theme === 'midnight' ? 'border-[#1F232D] bg-[#12141C]' : 'border-[#CBBFA0] bg-[#FAF7F0]'} ${displayEvent ? (theme === 'midnight' ? 'shadow-[0_8px_24px_rgba(197,168,128,0.06)]' : 'shadow-[0_8px_20px_rgba(142,111,64,0.08)]') : ''}`}
-                              style={{ width: isFocusMode ? '0%' : '25%' }}
+                              className={`border p-5 md:p-6 flex flex-col justify-between transition-all duration-300 ease-out lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto space-y-4 ${isFocusMode ? 'hidden' : 'block lg:col-span-4'} ${theme === 'midnight' ? 'border-[#1F232D] bg-[#12141C]' : 'border-[#CBBFA0] bg-[#FAF7F0]'} ${displayEvent ? (theme === 'midnight' ? 'shadow-[0_8px_24px_rgba(197,168,128,0.06)]' : 'shadow-[0_8px_20px_rgba(142,111,64,0.08)]') : ''}`}
                             >
                               <div
                                 className={`transition-all duration-300 ease-out will-change-transform ${
