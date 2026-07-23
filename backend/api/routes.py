@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import uuid
 from typing import Optional
 
 from fastapi import (
@@ -54,14 +56,32 @@ async def analyze_file(
         raise HTTPException(status_code=400, detail="Invalid file upload (missing filename).")
 
     file_name = file.filename
+    ext = file_name.lower().rsplit(".", 1)[-1] if "." in file_name else ""
+    allowed_exts = {"pdf", "txt", "json"}
+    allowed_mimes = {"application/pdf", "text/plain", "application/json"}
+    if ext not in allowed_exts and file.content_type not in allowed_mimes:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported file type. Only PDF, TXT, and JSON files are allowed."
+        )
+
     file_size = 0
     ocr_run = False
     page_count = 0
     extracted_text = ""
     
+    # Create temp directory in backend/temp if it doesn't exist
+    temp_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "temp")
+    os.makedirs(temp_dir, exist_ok=True)
+    temp_file_path = os.path.join(temp_dir, f"{uuid.uuid4()}_{file_name}")
+
     try:
         bytes_content = await file.read()
         file_size = len(bytes_content)
+        
+        # Safely write to temporary file
+        with open(temp_file_path, "wb") as f:
+            f.write(bytes_content)
         
         # 1. Detect file type and extract text
         if file_name.lower().endswith(".pdf"):
@@ -136,6 +156,13 @@ async def analyze_file(
             status_code=400,
             detail=f"Document parsing failed: {str(e)}"
         )
+    finally:
+        # Ensure cleanup of temp file
+        if os.path.exists(temp_file_path):
+            try:
+                os.remove(temp_file_path)
+            except Exception as clean_err:
+                logger.warning("Failed to remove temp file %s: %s", temp_file_path, clean_err)
 
 
 @router.post("/cases/upload")
@@ -166,24 +193,51 @@ async def upload_case(
 
     # 1. Handle file upload
     if file:
+        filename = file.filename or ""
+        ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
+        allowed_exts = {"pdf", "txt", "json"}
+        allowed_mimes = {"application/pdf", "text/plain", "application/json"}
+        if ext not in allowed_exts and file.content_type not in allowed_mimes:
+            raise HTTPException(
+                status_code=400,
+                detail="Unsupported file type. Only PDF, TXT, and JSON files are allowed."
+            )
+
+        temp_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "temp")
+        os.makedirs(temp_dir, exist_ok=True)
+        temp_file_path = os.path.join(temp_dir, f"{uuid.uuid4()}_{filename}")
         try:
             bytes_content = await file.read()
-            content = bytes_content.decode("utf-8")
-            # If JSON, try to parse details
-            if file.filename and file.filename.endswith(".json"):
+            with open(temp_file_path, "wb") as f:
+                f.write(bytes_content)
+                
+            if filename.lower().endswith(".pdf"):
+                from nlp.pdf_parser import extract_text_from_pdf
+                content, _, _ = extract_text_from_pdf(bytes_content, filename)
+            elif filename.lower().endswith(".json"):
+                decoded_content = bytes_content.decode("utf-8")
                 try:
-                    data = json.loads(content)
+                    data = json.loads(decoded_content)
                     if isinstance(data, dict):
                         citation = data.get("case_citation", citation)
                         court = data.get("court_name", court)
-                        content = data.get("text", data.get("raw_text", content))
+                        content = data.get("text", data.get("raw_text", decoded_content))
                 except json.JSONDecodeError:
-                    pass
-            elif not case_citation and file.filename:
+                    content = decoded_content
+            else:
+                content = bytes_content.decode("utf-8")
+
+            if not case_citation and filename:
                 # Deduce citation from filename (without extension)
-                citation = file.filename.rsplit(".", 1)[0]
+                citation = filename.rsplit(".", 1)[0]
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Failed to read file: {e}")
+            raise HTTPException(status_code=400, detail=f"Failed to read/parse file: {e}")
+        finally:
+            if os.path.exists(temp_file_path):
+                try:
+                    os.remove(temp_file_path)
+                except Exception as clean_err:
+                    logger.warning("Failed to remove temp file %s: %s", temp_file_path, clean_err)
     # 2. Handle raw text parameter
     elif raw_text:
         content = raw_text
@@ -291,6 +345,9 @@ def get_case_timeline(
             "title": ev.event_description or ev.sentence_text,
             "start": ev.absolute_date_iso or "",
             "sentence_index": ev.sentence_index,
+            "category": ev.category,
+            "actor": ev.actor,
+            "anchor_event_ref": ev.anchor_event_ref,
         })
 
     edges = []

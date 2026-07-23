@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     # ── Application ───────────────────────────────────────────────────────────
     app_env: str = Field(default="development", description="Deployment environment")
     log_level: str = Field(default="INFO", description="Python logging level")
+    gemini_api_key: str = Field(default="", description="Gemini API Key for structured extraction")
 
 
 # Singleton instance – import this everywhere instead of re-instantiating.

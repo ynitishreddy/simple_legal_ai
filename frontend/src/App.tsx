@@ -817,24 +817,53 @@ export default function App() {
   };
 
   const processUploadedFile = async (file: File) => {
+    // 25MB limit validation
+    if (file.size > 25 * 1024 * 1024) {
+      alert("File size exceeds the 25MB limit.");
+      return;
+    }
+
+    setIsUploading(true);
     try {
-      const text = await file.text();
-      if (file.name.endsWith('.json')) {
-        try {
-          const parsed = JSON.parse(text);
-          setCitationInput(parsed.case_citation || file.name.substring(0, file.name.lastIndexOf('.')) || file.name);
-          setCourtInput(parsed.court_name || "Generic Court");
-          setTextInput(parsed.text || parsed.raw_text || text);
-        } catch {
+      if (file.name.toLowerCase().endsWith('.pdf')) {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const res = await fetch('/api/cases/analyze-file', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || "PDF analysis failed");
+        }
+
+        const data = await res.json();
+        setCitationInput(data.metadata?.citation || file.name.substring(0, file.name.lastIndexOf('.')) || file.name);
+        setCourtInput(data.metadata?.court_name || "Generic Court");
+        setTextInput(data.extracted_text || "");
+      } else {
+        const text = await file.text();
+        if (file.name.endsWith('.json')) {
+          try {
+            const parsed = JSON.parse(text);
+            setCitationInput(parsed.case_citation || file.name.substring(0, file.name.lastIndexOf('.')) || file.name);
+            setCourtInput(parsed.court_name || "Generic Court");
+            setTextInput(parsed.text || parsed.raw_text || text);
+          } catch {
+            setTextInput(text);
+            setCitationInput(file.name.split('.')[0]);
+          }
+        } else {
           setTextInput(text);
           setCitationInput(file.name.split('.')[0]);
         }
-      } else {
-        setTextInput(text);
-        setCitationInput(file.name.split('.')[0]);
       }
-    } catch (e) {
-      alert("Could not parse file content.");
+    } catch (e: any) {
+      alert(e.message || "Could not parse file content.");
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -2699,7 +2728,7 @@ export default function App() {
                       <input
                         ref={fileInputRef}
                         type="file"
-                        accept=".txt,.json"
+                        accept=".pdf,.txt,.json,application/pdf,text/plain,application/json"
                         onChange={handleFileChange}
                         className="hidden"
                       />
@@ -2708,7 +2737,7 @@ export default function App() {
                         Drag files here or click to browse
                       </span>
                       <span className="text-[10px] text-slate-500 mt-1">
-                        Supports .txt or .json payloads
+                        Supports .pdf, .txt, or .json payloads
                       </span>
                     </div>
                   </div>

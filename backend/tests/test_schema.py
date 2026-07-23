@@ -156,6 +156,9 @@ class TestCRUD:
             case_id=case.id,
             trigger_word="Arrest",
             sentence_text="The accused was arrested on 5th March 2024.",
+            category="Arrest",
+            actor="Police",
+            anchor_event_ref="None",
         )
         db_session.add(event)
         db_session.flush()
@@ -164,6 +167,9 @@ class TestCRUD:
         assert fetched_event.event_trigger == "Arrest"   # via property alias
         assert fetched_event.trigger_word == "Arrest"
         assert fetched_event.case_id == case.id
+        assert fetched_event.category == "Arrest"
+        assert fetched_event.actor == "Police"
+        assert fetched_event.anchor_event_ref == "None"
 
     def test_insert_temporal_relation(self, db_session):
         case = Case(

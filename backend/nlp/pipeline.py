@@ -88,6 +88,9 @@ def run_nlp_pipeline(session_factory=None) -> dict:
                         relative_marker=(ev.relative_marker or "")[:500],
                         sentence_index=ev.sentence_index,
                         confidence=ev.confidence,
+                        category=ev.category[:50] if ev.category else None,
+                        actor=ev.actor[:255] if ev.actor else None,
+                        anchor_event_ref=ev.anchor_event_ref[:500] if ev.anchor_event_ref else None,
                     )
                     db.add(db_event)
                     events_inserted += 1

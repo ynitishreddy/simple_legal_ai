@@ -189,6 +189,9 @@ class Event(Base):
     relative_marker: Mapped[str | None] = mapped_column(String(500), nullable=True)
     sentence_index: Mapped[int | None] = mapped_column(nullable=True, default=0)
     confidence: Mapped[float | None] = mapped_column(nullable=True, default=1.0)
+    category: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    actor: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    anchor_event_ref: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow
     )

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import re
 import logging
+import os
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Optional
@@ -27,6 +28,10 @@ from typing import Optional
 import dateparser
 import spacy
 from spacy.matcher import Matcher
+import google.generativeai as genai
+
+from config import settings
+from nlp.schemas import LegalCategory, LegalEventsExtractionPayload, ExtractedEvent as LLMExtractedEvent
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +148,11 @@ class ExtractedEvent:
     # Extra dates found in sentence (beyond the primary one)
     secondary_dates: list[str] = field(default_factory=list)
 
+    # Rich metadata
+    category: Optional[str] = None
+    actor: Optional[str] = None
+    anchor_event_ref: Optional[str] = None
+
 
 # ── Extractor class ───────────────────────────────────────────────────────────
 
@@ -169,8 +179,103 @@ class EventExtractor:
     def extract(self, text: str) -> list[ExtractedEvent]:
         """
         Parse *text* and return a list of ExtractedEvent objects.
-        Only sentences containing at least one trigger AND one temporal
-        reference (absolute date or relative marker) are returned.
+        If GEMINI_API_KEY is configured in the environment or settings,
+        structured extraction using Gemini 1.5 Flash is executed.
+        Otherwise, falls back to legacy rules-based extraction.
+        """
+        if not text or not text.strip():
+            return []
+
+        api_key = settings.gemini_api_key or os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            logger.warning("GEMINI_API_KEY is missing. Falling back to rules-based extraction.")
+            return self._legacy_extract(text)
+
+        try:
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel("gemini-1.5-flash")
+            
+            prompt = (
+                "Extract all legally significant events from the following court judgment text. "
+                "For each event, identify the trigger word (a verb or key noun representing the action, e.g. arrested, filed, bail granted), "
+                "a concise 1-sentence event description, the exact source sentence, its legal category, the primary actor, "
+                "and any absolute or relative temporal details. "
+                "Ensure every event matches the required structured schema.\n\n"
+                f"Judgment Text:\n{text}"
+            )
+            
+            response = model.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    response_mime_type="application/json",
+                    response_schema=LegalEventsExtractionPayload,
+                ),
+            )
+            
+            payload = LegalEventsExtractionPayload.model_validate_json(response.text)
+            
+            # Map sentence texts to their index in the document using spaCy
+            doc = self._nlp(text)
+            sentence_lookup = {}
+            for idx, sent in enumerate(doc.sents):
+                cleaned = " ".join(sent.text.strip().split()).lower()
+                sentence_lookup[cleaned] = (idx, sent.start_char, sent.end_char)
+
+            events: list[ExtractedEvent] = []
+            for ev in payload.events:
+                # Resolve sentence index
+                ev_sent_cleaned = " ".join(ev.sentence_text.strip().split()).lower()
+                
+                # Check exact match first
+                sent_idx, start_char, end_char = 0, 0, 0
+                if ev_sent_cleaned in sentence_lookup:
+                    sent_idx, start_char, end_char = sentence_lookup[ev_sent_cleaned]
+                else:
+                    # Try substring overlap match
+                    best_match = None
+                    best_score = 0
+                    for clean_sent, (idx, sc, ec) in sentence_lookup.items():
+                        if clean_sent in ev_sent_cleaned or ev_sent_cleaned in clean_sent:
+                            score = min(len(clean_sent), len(ev_sent_cleaned)) / max(len(clean_sent), len(ev_sent_cleaned), 1)
+                            if score > best_score:
+                                best_score = score
+                                best_match = (idx, sc, ec)
+                    if best_match:
+                        sent_idx, start_char, end_char = best_match
+
+                # Normalize raw absolute date to ISO format
+                absolute_date_iso = None
+                if ev.absolute_date_raw:
+                    absolute_date_iso = self._normalize_date(ev.absolute_date_raw)
+
+                events.append(
+                    ExtractedEvent(
+                        sentence_text=ev.sentence_text,
+                        trigger_word=ev.trigger_word,
+                        event_description=ev.event_description,
+                        absolute_date_raw=ev.absolute_date_raw,
+                        absolute_date_iso=absolute_date_iso,
+                        relative_marker=ev.relative_marker,
+                        sentence_index=sent_idx,
+                        char_start=start_char,
+                        char_end=end_char,
+                        confidence=ev.confidence_score,
+                        category=ev.category.value if ev.category else None,
+                        actor=ev.actor,
+                        anchor_event_ref=ev.anchor_event_ref,
+                    )
+                )
+            
+            logger.info("Structured LLM extraction complete: %d events extracted", len(events))
+            return events
+
+        except Exception as e:
+            logger.error("Gemini API structured extraction failed: %s. Falling back to rules-based extraction.", e, exc_info=True)
+            return self._legacy_extract(text)
+
+    def _legacy_extract(self, text: str) -> list[ExtractedEvent]:
+        """
+        Legacy rule-based parser as fallback.
         """
         if not text or not text.strip():
             return []
@@ -215,7 +320,7 @@ class EventExtractor:
             )
             events.append(event)
 
-        logger.debug("extract(): %d events from %d chars", len(events), len(text))
+        logger.debug("_legacy_extract(): %d events from %d chars", len(events), len(text))
         return events
 
     # ── Private helpers ───────────────────────────────────────────────────────

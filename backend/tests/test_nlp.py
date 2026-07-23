@@ -364,3 +364,51 @@ class TestPipelineExecution:
 
         assert r2["cases_processed"] == 0, "Second run should find no PENDING cases"
         assert r2["events_inserted"] == 0
+
+
+class TestExtractorLLM:
+    def test_llm_extraction_success(self, monkeypatch):
+        from nlp.extractor import EventExtractor
+        import google.generativeai as genai
+        
+        # Mock Response Object
+        class MockResponse:
+            text = """{
+                "events": [
+                    {
+                        "trigger_word": "arrested",
+                        "event_description": "The accused Ramesh was arrested by Pune police.",
+                        "sentence_text": "The accused Ramesh was arrested by Pune police on 16th August 2022.",
+                        "category": "Arrest",
+                        "actor": "Police",
+                        "absolute_date_raw": "16th August 2022",
+                        "relative_marker": null,
+                        "anchor_event_ref": null,
+                        "confidence_score": 0.95
+                    }
+                ]
+            }"""
+
+        # Mock Model Object
+        class MockModel:
+            def generate_content(self, *args, **kwargs):
+                return MockResponse()
+
+        # Monkeypatch GenerativeModel and configure
+        monkeypatch.setenv("GEMINI_API_KEY", "test-api-key")
+        monkeypatch.setattr(genai, "GenerativeModel", lambda model_name: MockModel())
+        monkeypatch.setattr(genai, "configure", lambda api_key: None)
+
+        ex = EventExtractor()
+        events = ex.extract("The accused Ramesh was arrested by Pune police on 16th August 2022.")
+        
+        assert len(events) == 1
+        ev = events[0]
+        assert ev.trigger_word == "arrested"
+        assert ev.event_description == "The accused Ramesh was arrested by Pune police."
+        assert ev.sentence_text == "The accused Ramesh was arrested by Pune police on 16th August 2022."
+        assert ev.category == "Arrest"
+        assert ev.actor == "Police"
+        assert ev.absolute_date_raw == "16th August 2022"
+        assert ev.absolute_date_iso == "2022-08-16"
+        assert ev.confidence == 0.95

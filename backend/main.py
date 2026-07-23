@@ -34,6 +34,13 @@ async def lifespan(app: FastAPI):
     # Startup: log configuration info
     logger.info("Starting Automatic Legal Timeline API...")
     logger.info("Database URL configured: %s", settings.database_url)
+    
+    # Asynchronously seed the database if empty (exactly 3 cases)
+    import threading
+    from db.seed import seed_database
+    logger.info("Database Seeding Check: spawning daemon thread...")
+    threading.Thread(target=seed_database, args=(3,), daemon=True).start()
+    
     yield
     # Shutdown: clean up engine pools
     logger.info("Shutting down API...")
