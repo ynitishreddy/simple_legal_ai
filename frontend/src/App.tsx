@@ -69,6 +69,45 @@ function highlightText(text: string = '', query: string = '', isMidnight: boolea
   );
 }
 
+const getCategoryBadgeClasses = (label: string) => {
+  const l = (label || '').toUpperCase();
+  if (l.includes('APPOINT') || l.includes('SERVICE') || l.includes('CIVIL')) {
+    return 'bg-blue-950/60 text-blue-400 border border-blue-800';
+  }
+  if (l.includes('PETITION') || l.includes('APPEAL') || l.includes('MOTION')) {
+    return 'bg-amber-950/60 text-amber-400 border border-amber-800';
+  }
+  if (l.includes('ARREST') || l.includes('FIR') || l.includes('DETEN') || l.includes('CUSTODY')) {
+    return 'bg-rose-950/60 text-rose-400 border border-rose-800';
+  }
+  if (l.includes('BAIL') || l.includes('DISCHARGE') || l.includes('ORDER')) {
+    return 'bg-emerald-950/60 text-emerald-400 border border-emerald-800';
+  }
+  return 'bg-slate-800 text-slate-300 border border-slate-700';
+};
+
+const getImportanceBadgeClasses = (imp: string, theme: string) => {
+  const isMidnight = theme === 'midnight';
+  if (imp === 'Critical') {
+    return isMidnight
+      ? 'bg-rose-950/80 text-rose-300 border border-rose-800'
+      : 'bg-rose-100 text-rose-700 border border-rose-300';
+  }
+  if (imp === 'High') {
+    return isMidnight
+      ? 'bg-amber-950/80 text-amber-300 border border-amber-800'
+      : 'bg-amber-100 text-amber-700 border border-amber-300';
+  }
+  if (imp === 'Medium') {
+    return isMidnight
+      ? 'bg-blue-950/80 text-blue-300 border border-blue-800'
+      : 'bg-blue-100 text-blue-700 border border-blue-300';
+  }
+  return isMidnight
+    ? 'bg-slate-900 text-slate-300 border border-slate-700'
+    : 'bg-slate-100 text-slate-750 border border-slate-300';
+};
+
 /**
  * Feature 2: All Event Category list & category matching heuristic
  */
@@ -1107,17 +1146,7 @@ export default function App() {
                         <div className="flex flex-col">
                           {filteredTimelineEvents.map((ev, idx) => {
                             const isSelected = selectedEvent?.id === ev.id;
-                            const isLeft = idx % 2 === 0;
-                            const nextEv = filteredTimelineEvents[idx + 1];
-                            let gapHeight = 110;
-                            if (nextEv && ev.start && nextEv.start) {
-                              const d1 = new Date(ev.start).getTime();
-                              const d2 = new Date(nextEv.start).getTime();
-                              const diffDays = Math.ceil(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24));
-                              if (diffDays > 0) {
-                                gapHeight = Math.min(220, Math.max(90, 80 + Math.log2(diffDays) * 12));
-                              }
-                            }
+                            let gapHeight = 16;
                             
                             const isNodeConnected = connectedEventIds.has(ev.id);
                             const isNodeHoverConnected = hoveredConnectedIds.has(ev.id);
@@ -1151,6 +1180,16 @@ export default function App() {
                                 onMouseEnter={() => setHoveredIndex(idx)}
                                 onMouseLeave={() => setHoveredIndex(null)}
                               >
+                                <div className="w-[45%] text-right pr-6 flex items-center justify-end">
+                                  <span className={`text-[9px] font-mono-meta font-bold uppercase tracking-wider ${
+                                    isSelected 
+                                      ? (theme === 'midnight' ? 'text-[#C5A880]' : 'text-[#8E6F40]') 
+                                      : (theme === 'midnight' ? 'text-slate-300' : 'text-[#5C5C5C]')
+                                  }`}>
+                                    {highlightText(ev.start || "Unanchored", eventSearchQuery, theme === 'midnight')}
+                                  </span>
+                                </div>
+
                                 <div className="absolute left-1/2 transform -translate-x-1/2 z-10 flex items-center justify-center">
                                   <span
                                     onClick={() => setSelectedEvent(ev)}
@@ -1160,10 +1199,10 @@ export default function App() {
                                   </span>
                                 </div>
 
-                                <div className={`w-[45%] text-left ${isLeft ? 'ml-auto pl-6' : 'mr-auto pr-6 text-right'}`}>
+                                <div className="w-[45%] text-left pl-6 flex flex-col justify-center">
                                   <div
                                     onClick={() => setSelectedEvent(ev)}
-                                    className={`p-4 border rounded-md cursor-pointer transition-all duration-200 text-left relative ${
+                                    className={`p-3 border rounded-md cursor-pointer transition-all duration-200 text-left relative ${
                                       isSelected
                                         ? (theme === 'midnight' ? 'bg-[#12141C] border-[#C5A880] shadow-[0_4px_16px_rgba(0,0,0,0.3)]' : 'bg-[#FAF7F0] border-[#8E6F40] shadow-[0_4px_12px_rgba(60,50,20,0.06)]')
                                         : isNodeConnected
@@ -1173,32 +1212,16 @@ export default function App() {
                                   >
                                     <div className="flex justify-between items-center mb-1">
                                       <div className="flex items-center space-x-1.5">
-                                        <span className={`text-[8.5px] font-mono-meta uppercase tracking-[0.12em] font-bold ${
-                                          isSelected 
-                                            ? (theme === 'midnight' ? 'text-[#C5A880]' : 'text-[#8E6F40]') 
-                                            : (theme === 'midnight' ? 'text-[#8B949E]' : 'text-[#5C5C5C]')
-                                        }`}>
+                                        <span className={`text-[8.5px] font-mono-meta uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full ${getCategoryBadgeClasses(ev.label)}`}>
                                           {highlightText(ev.label, eventSearchQuery, theme === 'midnight')}
                                         </span>
                                         {/* Feature 3 Importance Badge */}
-                                        <span className={`text-[7px] font-extrabold px-1 py-0.2 rounded uppercase ${
-                                          importance === 'Critical' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
-                                          importance === 'High' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
-                                          importance === 'Medium' ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' :
-                                          'bg-slate-500/20 text-slate-400 border border-slate-500/30'
-                                        }`}>
+                                        <span className={`text-[7px] font-extrabold px-1.5 py-0.5 rounded uppercase border tracking-wider ${getImportanceBadgeClasses(importance, theme)}`}>
                                           {importance}
                                         </span>
                                       </div>
-                                      {ev.start && (
-                                        <span className={`text-[8px] font-mono-meta px-1.5 py-0.5 border tracking-[0.05em] uppercase rounded ${
-                                          theme === 'midnight' ? 'bg-[#08090C] border-[#1F232D] text-[#8B949E]' : 'bg-[#FFFFFF] border-[#E3DEC3] text-[#5C5C5C]'
-                                        }`}>
-                                          {highlightText(ev.start, eventSearchQuery, theme === 'midnight')}
-                                        </span>
-                                      )}
                                     </div>
-                                    <p className={`font-serif-legal text-[11px] leading-relaxed tracking-wide mt-2 ${
+                                    <p className={`font-serif-legal text-[11px] leading-relaxed tracking-wide mt-1 line-clamp-2 ${
                                       theme === 'midnight' ? 'text-[#C9D1D9]' : 'text-[#3A3A3A]'
                                     }`}>
                                       {highlightText(ev.title, eventSearchQuery, theme === 'midnight')}
@@ -1230,7 +1253,7 @@ export default function App() {
                       {displayEvent ? (
                         <div className="space-y-4 text-left">
                           <div>
-                            <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1 ${theme === 'midnight' ? 'text-[#8B949E]' : 'text-[#5C5C5C] font-semibold'}`}>
+                            <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1 ${theme === 'midnight' ? 'text-slate-300' : 'text-[#5C5C5C] font-semibold'}`}>
                               Evidence Node Citation ID
                             </span>
                             <span className={`text-[10px] font-mono px-2 py-0.5 border font-mono-meta rounded ${theme === 'midnight' ? 'bg-[#08090C] border-[#1F232D] text-[#C9D1D9]' : 'bg-[#FFFFFF] border-[#E3DEC3] text-[#1A1A1A]'}`}>
@@ -1240,15 +1263,15 @@ export default function App() {
 
                           <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1 ${theme === 'midnight' ? 'text-[#8B949E]' : 'text-[#5C5C5C] font-semibold'}`}>
+                              <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1 ${theme === 'midnight' ? 'text-slate-300' : 'text-[#5C5C5C] font-semibold'}`}>
                                 Trigger Type
                               </span>
-                              <span className={`text-[9.5px] font-mono-meta uppercase tracking-[0.12em] font-bold block ${theme === 'midnight' ? 'text-[#C5A880]' : 'text-[#8E6F40]'}`}>
+                              <span className={`text-[8.5px] font-mono-meta uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full inline-block mt-0.5 ${getCategoryBadgeClasses(displayEvent.label)}`}>
                                 {highlightText(displayEvent.label, eventSearchQuery, theme === 'midnight')}
                               </span>
                             </div>
                             <div>
-                              <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1 ${theme === 'midnight' ? 'text-[#8B949E]' : 'text-[#5C5C5C] font-semibold'}`}>
+                              <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1 ${theme === 'midnight' ? 'text-slate-300' : 'text-[#5C5C5C] font-semibold'}`}>
                                 Chronological Date
                               </span>
                               <span className={`text-[9.5px] font-mono-meta block ${theme === 'midnight' ? 'text-[#C9D1D9]' : 'text-[#1A1A1A]'}`}>
@@ -1259,18 +1282,13 @@ export default function App() {
 
                           {/* Importance Score Display (Feature 3) */}
                           <div>
-                            <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1 ${theme === 'midnight' ? 'text-[#8B949E]' : 'text-[#5C5C5C] font-semibold'}`}>
+                            <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1 ${theme === 'midnight' ? 'text-slate-300' : 'text-[#5C5C5C] font-semibold'}`}>
                               Event Importance Rating
                             </span>
                             {(() => {
                               const imp = getEventImportance(displayEvent.label, displayEvent.title);
                               return (
-                                <span className={`text-[9.5px] font-extrabold px-2 py-0.5 rounded border uppercase tracking-wider inline-block ${
-                                  imp === 'Critical' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' :
-                                  imp === 'High' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
-                                  imp === 'Medium' ? 'bg-sky-500/20 text-sky-400 border-sky-500/30' :
-                                  'bg-slate-500/20 text-slate-400 border-slate-500/30'
-                                }`}>
+                                <span className={`text-[9.5px] font-extrabold px-2 py-0.5 rounded border uppercase tracking-wider inline-block ${getImportanceBadgeClasses(imp, theme)}`}>
                                   Importance: {imp}
                                 </span>
                               );
@@ -1278,7 +1296,7 @@ export default function App() {
                           </div>
 
                           <div>
-                            <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1 ${theme === 'midnight' ? 'text-[#8B949E]' : 'text-[#5C5C5C] font-semibold'}`}>
+                            <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1 ${theme === 'midnight' ? 'text-slate-300' : 'text-[#5C5C5C] font-semibold'}`}>
                               Chronological Sequence Index
                             </span>
                             <span className={`text-[10px] font-mono px-2 py-0.5 border font-mono-meta rounded ${theme === 'midnight' ? 'bg-[#08090C] border-[#1F232D] text-[#C9D1D9]' : 'bg-[#FFFFFF] border-[#E3DEC3] text-[#1A1A1A]'}`}>
@@ -1287,12 +1305,12 @@ export default function App() {
                           </div>
 
                           <div className="pt-2 border-t border-slate-200 dark:border-[#1F232D]/40">
-                            <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1.5 ${theme === 'midnight' ? 'text-[#8B949E]' : 'text-[#5C5C5C] font-semibold'}`}>
+                            <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1.5 ${theme === 'midnight' ? 'text-slate-300' : 'text-[#5C5C5C] font-semibold'}`}>
                               Source Transcript Context Sentence
                             </span>
                             <div 
                               className={`p-3.5 border rounded-md shadow-inner leading-relaxed text-left tracking-wide font-serif-legal ${
-                                theme === 'midnight' ? 'bg-[#08090C] border-[#1F232D] text-[#8B949E]' : 'bg-[#FFFFFF] border-[#E3DEC3] text-[#3A3A3A]'
+                                theme === 'midnight' ? 'bg-[#08090C] border-[#1F232D] text-slate-300' : 'bg-[#FFFFFF] border-[#E3DEC3] text-[#3A3A3A]'
                               }`}
                               style={{ fontSize: `${contextFontSize}px` }}
                             >
@@ -2326,17 +2344,8 @@ export default function App() {
                                   <div className="flex flex-col">
                                     {filteredTimelineEvents.map((ev, idx) => {
                                       const isSelected = selectedEvent?.id === ev.id;
-                                      const isLeft = idx % 2 === 0;
                                       const nextEv = filteredTimelineEvents[idx + 1];
-                                      let gapHeight = 110;
-                                      if (nextEv && ev.start && nextEv.start) {
-                                        const d1 = new Date(ev.start).getTime();
-                                        const d2 = new Date(nextEv.start).getTime();
-                                        const diffDays = Math.ceil(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24));
-                                        if (diffDays > 0) {
-                                          gapHeight = Math.min(340, Math.max(110, Math.log10(diffDays) * 100));
-                                        }
-                                      }
+                                      let gapHeight = 32;
 
                                       const importance = getEventImportance(ev.label, ev.title);
 
@@ -2349,6 +2358,12 @@ export default function App() {
                                           onMouseEnter={() => setHoveredIndex(idx)}
                                           onMouseLeave={() => setHoveredIndex(null)}
                                         >
+                                          <div className="w-[45%] text-right pr-6 flex items-center justify-end">
+                                            <span className={`text-[9px] font-mono-meta uppercase tracking-wider ${theme === 'midnight' ? 'text-slate-300' : 'text-[#1A1A1A] font-extrabold'}`}>
+                                              {ev.start || "Unanchored"}
+                                            </span>
+                                          </div>
+
                                           <div className="absolute left-1/2 transform -translate-x-1/2 z-10 flex items-center justify-center">
                                             <span
                                               onClick={() => setSelectedEvent(ev)}
@@ -2372,91 +2387,37 @@ export default function App() {
                                             </span>
                                           </div>
 
-                                          <div className="w-[45%] text-right pr-6 flex flex-col justify-center">
-                                            {isLeft ? (
-                                              <div 
-                                                onClick={() => setSelectedEvent(ev)}
-                                                className={`p-4 border text-left cursor-pointer transition-all duration-300 ease-out ${
-                                                  isSelected
-                                                    ? (theme === 'midnight' ? 'bg-[#12141C] border-[#C5A880] text-[#F0F6FC] shadow-md shadow-[#C5A880]/5' : 'bg-[#FAF7F0] border-[#8E6F40] text-[#1A1A1A] shadow-md shadow-[#8E6F40]/10')
-                                                    : (theme === 'midnight' ? 'bg-[#12141C]/40 border-[#1F232D] hover:border-[#8B949E]/40 hover:-translate-y-0.5 hover:shadow-md hover:shadow-black/10 text-[#8B949E] hover:text-[#C9D1D9]' : 'bg-[#FFFFFF] border-[#E3DEC3] hover:border-[#B2A888] hover:-translate-y-0.5 hover:shadow-md hover:shadow-black/5 text-[#5C5C5C] hover:text-[#1A1A1A]')
-                                                }`}
-                                              >
-                                                <div className="flex justify-between items-center mb-1">
-                                                  <div className="flex items-center space-x-1.5">
-                                                    <span className={`text-[9px] font-mono-meta uppercase tracking-wider font-semibold ${theme === 'midnight' ? 'text-[#C5A880]' : 'text-[#8E6F40]'}`}>
-                                                      {highlightText(ev.label, eventSearchQuery, theme === 'midnight')}
-                                                    </span>
-                                                    {/* Feature 3 Importance Badge */}
-                                                    <span className={`text-[7px] font-extrabold px-1 py-0.2 rounded uppercase ${
-                                                      importance === 'Critical' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
-                                                      importance === 'High' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
-                                                      importance === 'Medium' ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' :
-                                                      'bg-slate-500/20 text-slate-400 border border-slate-500/30'
-                                                    }`}>
-                                                      {importance}
-                                                    </span>
-                                                  </div>
-                                                  <span className={`text-[8.5px] font-mono-meta px-1 border ${theme === 'midnight' ? 'bg-[#08090C] border-[#1F232D] text-[#8B949E]' : 'bg-[#EBE7D9] border-[#CBBFA0] text-[#1A1A1A] font-bold'}`}>
-                                                    {highlightText(ev.start || "NO DATE", eventSearchQuery, theme === 'midnight')}
-                                                  </span>
-                                                </div>
-                                                <p className="text-[10px] line-clamp-4 leading-relaxed">
-                                                  {highlightText(ev.title, eventSearchQuery, theme === 'midnight')}
-                                                </p>
-                                              </div>
-                                            ) : (
-                                              <span className={`text-[9px] font-mono-meta uppercase tracking-wider ${theme === 'midnight' ? 'text-[#8B949E]' : 'text-[#1A1A1A] font-extrabold'}`}>
-                                                {ev.start || "Unanchored"}
-                                              </span>
-                                            )}
-                                          </div>
-
                                           <div className="w-[10%]" />
 
                                           <div className="w-[45%] text-left pl-6 flex flex-col justify-center">
-                                            {!isLeft ? (
-                                              <div 
-                                                onClick={() => setSelectedEvent(ev)}
-                                                className={`p-4 border text-left cursor-pointer transition-all duration-300 ease-out ${
-                                                  isSelected
-                                                    ? (theme === 'midnight' ? 'bg-[#12141C] border-[#C5A880] text-[#F0F6FC] shadow-md shadow-[#C5A880]/5' : 'bg-[#FAF7F0] border-[#8E6F40] text-[#1A1A1A] shadow-md shadow-[#8E6F40]/10')
-                                                    : (theme === 'midnight' ? 'bg-[#12141C]/40 border-[#1F232D] hover:border-[#8B949E]/40 hover:-translate-y-0.5 hover:shadow-md hover:shadow-black/10 text-[#8B949E] hover:text-[#C9D1D9]' : 'bg-[#FFFFFF] border-[#E3DEC3] hover:border-[#B2A888] hover:-translate-y-0.5 hover:shadow-md hover:shadow-black/5 text-[#5C5C5C] hover:text-[#1A1A1A]')
-                                                }`}
-                                              >
-                                                <div className="flex justify-between items-center mb-1">
-                                                  <div className="flex items-center space-x-1.5">
-                                                    <span className={`text-[9px] font-mono-meta uppercase tracking-wider font-semibold ${theme === 'midnight' ? 'text-[#C5A880]' : 'text-[#8E6F40]'}`}>
-                                                      {highlightText(ev.label, eventSearchQuery, theme === 'midnight')}
-                                                    </span>
-                                                    {/* Feature 3 Importance Badge */}
-                                                    <span className={`text-[7px] font-extrabold px-1 py-0.2 rounded uppercase ${
-                                                      importance === 'Critical' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
-                                                      importance === 'High' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
-                                                      importance === 'Medium' ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' :
-                                                      'bg-slate-500/20 text-slate-400 border border-slate-500/30'
-                                                    }`}>
-                                                      {importance}
-                                                    </span>
-                                                  </div>
-                                                  <span className={`text-[8.5px] font-mono-meta px-1 border ${theme === 'midnight' ? 'bg-[#08090C] border-[#1F232D] text-[#8B949E]' : 'bg-[#EBE7D9] border-[#CBBFA0] text-[#1A1A1A] font-bold'}`}>
-                                                    {highlightText(ev.start || "NO DATE", eventSearchQuery, theme === 'midnight')}
+                                            <div 
+                                              onClick={() => setSelectedEvent(ev)}
+                                              className={`p-3 border text-left cursor-pointer transition-all duration-300 ease-out rounded-lg ${
+                                                isSelected
+                                                  ? (theme === 'midnight' ? 'bg-[#12141C] border-[#C5A880] text-[#F0F6FC] shadow-md shadow-[#C5A880]/5' : 'bg-[#FAF7F0] border-[#8E6F40] text-[#1A1A1A] shadow-md shadow-[#8E6F40]/10')
+                                                  : (theme === 'midnight' ? 'bg-[#12141C]/40 border-[#1F232D] hover:border-[#8B949E]/40 hover:-translate-y-0.5 hover:shadow-md hover:shadow-black/10 text-[#8B949E] hover:text-[#C9D1D9]' : 'bg-[#FFFFFF] border-[#E3DEC3] hover:border-[#B2A888] hover:-translate-y-0.5 hover:shadow-md hover:shadow-black/5 text-[#5C5C5C] hover:text-[#1A1A1A]')
+                                              }`}
+                                            >
+                                              <div className="flex justify-between items-center mb-1">
+                                                <div className="flex items-center space-x-1.5">
+                                                  <span className={`text-[9px] font-mono-meta uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full ${getCategoryBadgeClasses(ev.label)}`}>
+                                                    {highlightText(ev.label, eventSearchQuery, theme === 'midnight')}
+                                                  </span>
+                                                  {/* Feature 3 Importance Badge */}
+                                                  <span className={`text-[7px] font-extrabold px-1.5 py-0.5 rounded uppercase border tracking-wider ${getImportanceBadgeClasses(importance, theme)}`}>
+                                                    {importance}
                                                   </span>
                                                 </div>
-                                                <p className="text-[10px] line-clamp-4 leading-relaxed">
-                                                  {highlightText(ev.title, eventSearchQuery, theme === 'midnight')}
-                                                </p>
                                               </div>
-                                            ) : (
-                                              <span className={`text-[9px] font-mono-meta uppercase tracking-wider ${theme === 'midnight' ? 'text-[#8B949E]' : 'text-[#1A1A1A] font-extrabold'}`}>
-                                                {ev.start || "Unanchored"}
-                                              </span>
-                                            )}
+                                              <p className="text-[10px] line-clamp-2 leading-relaxed">
+                                                {highlightText(ev.title, eventSearchQuery, theme === 'midnight')}
+                                              </p>
+                                            </div>
                                           </div>
 
                                           {nextEv && ev.start && nextEv.start && (
-                                            <div className="absolute left-1/2 transform -translate-x-1/2 -bottom-[28px] z-20 flex justify-center w-full pointer-events-none">
-                                              <span className={`text-[8px] font-mono-meta font-bold px-2 py-0.5 border uppercase tracking-wider select-none ${theme === 'midnight' ? 'border-[#1F232D] bg-[#08090C] text-[#8B949E]' : 'border-[#CBBFA0] bg-[#EFECE1] text-[#1A1A1A]'}`}>
+                                            <div className="absolute left-1/2 transform -translate-x-1/2 -bottom-[20px] z-20 flex justify-center w-full pointer-events-none">
+                                              <span className={`text-[7px] font-mono-meta font-bold px-1.5 py-0.2 border uppercase tracking-wider select-none ${theme === 'midnight' ? 'border-[#1F232D] bg-[#08090C] text-[#8B949E]' : 'border-[#CBBFA0] bg-[#EFECE1] text-[#1A1A1A]'}`}>
                                                 ↓ {calculateDuration(ev.start, nextEv.start)} elapsed
                                               </span>
                                             </div>
@@ -2507,7 +2468,7 @@ export default function App() {
                                 {displayEvent ? (
                                   <div className="space-y-4 text-left">
                                     <div>
-                                      <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1 ${theme === 'midnight' ? 'text-[#8B949E]' : 'text-[#5C5C5C] font-semibold'}`}>
+                                      <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1 ${theme === 'midnight' ? 'text-slate-300' : 'text-[#5C5C5C] font-semibold'}`}>
                                         Evidence Node Citation ID
                                       </span>
                                       <span className={`text-[10px] font-mono px-2 py-0.5 border font-mono-meta ${theme === 'midnight' ? 'bg-[#08090C] border-[#1F232D] text-[#C9D1D9]' : 'bg-[#FFFFFF] border-[#E3DEC3] text-[#1A1A1A]'}`}>
@@ -2517,15 +2478,15 @@ export default function App() {
 
                                     <div className="grid grid-cols-2 gap-4">
                                       <div>
-                                        <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1 ${theme === 'midnight' ? 'text-[#8B949E]' : 'text-[#5C5C5C] font-semibold'}`}>
+                                        <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1 ${theme === 'midnight' ? 'text-slate-300' : 'text-[#5C5C5C] font-semibold'}`}>
                                           Trigger Type
                                         </span>
-                                        <span className={`text-[10px] font-mono px-2 py-0.5 border font-mono-meta ${theme === 'midnight' ? 'bg-[#08090C] border-[#1F232D] text-[#C5A880]' : 'bg-[#FFFFFF] border-[#E3DEC3] text-[#8E6F40]'}`}>
+                                        <span className={`text-[8.5px] font-mono-meta uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full inline-block mt-0.5 ${getCategoryBadgeClasses(displayEvent.label)}`}>
                                           {highlightText(displayEvent.label.toUpperCase(), eventSearchQuery, theme === 'midnight')}
                                         </span>
                                       </div>
                                       <div>
-                                        <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1 ${theme === 'midnight' ? 'text-[#8B949E]' : 'text-[#5C5C5C] font-semibold'}`}>
+                                        <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1 ${theme === 'midnight' ? 'text-slate-300' : 'text-[#5C5C5C] font-semibold'}`}>
                                           Temporal Anchor
                                         </span>
                                         <span className={`text-[10px] font-mono px-2 py-0.5 border font-mono-meta ${theme === 'midnight' ? 'bg-[#08090C] border-[#1F232D] text-[#F0F6FC]' : 'bg-[#FFFFFF] border-[#E3DEC3] text-[#1A1A1A]'}`}>
@@ -2534,20 +2495,14 @@ export default function App() {
                                       </div>
                                     </div>
 
-                                    {/* Importance Level display in detail panel (Feature 3) */}
                                     <div>
-                                      <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1 ${theme === 'midnight' ? 'text-[#8B949E]' : 'text-[#5C5C5C] font-semibold'}`}>
+                                      <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1 ${theme === 'midnight' ? 'text-slate-300' : 'text-[#5C5C5C] font-semibold'}`}>
                                         Event Importance Rating
                                       </span>
                                       {(() => {
                                         const imp = getEventImportance(displayEvent.label, displayEvent.title);
                                         return (
-                                          <span className={`text-[9.5px] font-extrabold px-2 py-0.5 rounded border uppercase tracking-wider inline-block ${
-                                            imp === 'Critical' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' :
-                                            imp === 'High' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
-                                            imp === 'Medium' ? 'bg-sky-500/20 text-sky-400 border-sky-500/30' :
-                                            'bg-slate-500/20 text-slate-400 border-slate-500/30'
-                                          }`}>
+                                          <span className={`text-[9.5px] font-extrabold px-2 py-0.5 rounded border uppercase tracking-wider inline-block ${getImportanceBadgeClasses(imp, theme)}`}>
                                             Importance: {imp}
                                           </span>
                                         );
@@ -2555,16 +2510,16 @@ export default function App() {
                                     </div>
 
                                     <div>
-                                      <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1 ${theme === 'midnight' ? 'text-[#8B949E]' : 'text-[#5C5C5C] font-semibold'}`}>
-                                        Resolved Sentence Index
+                                      <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1 ${theme === 'midnight' ? 'text-slate-300' : 'text-[#5C5C5C] font-semibold'}`}>
+                                        Chronological Sequence Index
                                       </span>
-                                      <span className={`text-[10px] font-mono-meta ${theme === 'midnight' ? 'text-[#8B949E]' : 'text-[#3A3A3A] font-semibold'}`}>
-                                        Sentence Index Location #{displayEvent.sentence_index}
+                                      <span className={`text-[10px] font-mono px-2 py-0.5 border font-mono-meta rounded ${theme === 'midnight' ? 'bg-[#08090C] border-[#1F232D] text-[#C9D1D9]' : 'bg-[#FFFFFF] border-[#E3DEC3] text-[#1A1A1A]'}`}>
+                                        NODE_REF_{displayEvent.sentence_index}
                                       </span>
                                     </div>
 
-                                    <div>
-                                      <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1 ${theme === 'midnight' ? 'text-[#8B949E]' : 'text-[#5C5C5C] font-semibold'}`}>
+                                    <div className="pt-2 border-t border-slate-200 dark:border-[#1F232D]/40">
+                                      <span className={`text-[8px] font-mono-meta uppercase tracking-wider block mb-1.5 ${theme === 'midnight' ? 'text-slate-300' : 'text-[#5C5C5C] font-semibold'}`}>
                                         Source Transcript Context Sentence
                                       </span>
                                       <p
