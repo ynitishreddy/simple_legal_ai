@@ -6,9 +6,15 @@ boto3>=1.34.0
 python-dotenv>=1.0.0
 alembic>=1.13.0
 networkx>=3.0
+
+# Backend / API
 fastapi>=0.100.0
 uvicorn>=0.20.0
 python-multipart>=0.0.5
+
+# NLP / AI
+spacy>=3.8.0
+dateparser>=1.2.0
 google-generativeai>=0.8.0
 
 # Dev / testing
