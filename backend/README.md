@@ -31,13 +31,13 @@ The backend is built around a multi-stage pipeline:
 
 ```mermaid
 flowchart LR
-    A[Raw Document / S3 / Upload] --> B[PDF Reader & OCR Fallback]
-    B --> C[Metadata Extractor]
-    B --> D[Temporal NLP Extractor]
-    D -->|Gemini API / spaCy Rule-Based| E[Normalized Events & Dates]
-    E --> F[Graph Engine: Anchor Resolution & Transitive Reduction]
-    F --> G[(SQLAlchemy ORM: SQLite/Postgres)]
-    G --> H[FastAPI REST API]
+    A["Raw Document / S3 / Upload"] --> B["PDF Reader & OCR Fallback"]
+    B --> C["Metadata Extractor"]
+    B --> D["Temporal NLP Extractor"]
+    D -->|"Gemini API / spaCy Rule-Based"| E["Normalized Events & Dates"]
+    E --> F["Graph Engine: Anchor Resolution & Transitive Reduction"]
+    F --> G[("SQLAlchemy ORM: SQLite / Postgres")]
+    G --> H["FastAPI REST API"]
 ```
 
 1. **Document Ingestion**: Supports direct text, `.txt`, `.json`, and `.pdf` uploads. Multi-engine PDF parser (PyMuPDF, pdfplumber, pypdf, pdfminer.six) with automatic scanned document detection and Tesseract OCR fallback.

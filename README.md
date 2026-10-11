@@ -79,34 +79,34 @@ Legal judgment texts are inherently long, non-linear, and dense. Critical proced
 ```mermaid
 flowchart TD
     subgraph Ingestion ["1. Document Ingestion"]
-        Upload[Upload PDF / TXT / JSON] --> Parser[Multi-Engine PDF / Text Parser]
-        Parser --> OCR{Scanned PDF?}
-        OCR -- Yes --> Tesseract[Tesseract OCR Engine]
-        OCR -- No --> RawText[Raw Cleaned Judgment Text]
+        Upload["Upload PDF / TXT / JSON"] --> Parser["Multi-Engine PDF / Text Parser"]
+        Parser --> OCR{"Scanned PDF?"}
+        OCR -->|Yes| Tesseract["Tesseract OCR Engine"]
+        OCR -->|No| RawText["Raw Cleaned Judgment Text"]
         Tesseract --> RawText
     end
 
     subgraph NLP ["2. NLP & Temporal Extraction"]
-        RawText --> MetaExt[Metadata Extractor\n(Court, Bench, Acts, Citation)]
-        RawText --> Extractor{Gemini API Key?}
-        Extractor -- Configured --> LLM[Gemini 2.5 Flash\nStructured Schema]
-        Extractor -- Omitted / Offline --> Rules[spaCy + Regex Engine\nLemmas & DateParser]
-        LLM --> Events[Extracted Temporal Events]
+        RawText --> MetaExt["Metadata Extractor<br/>(Court, Bench, Acts, Citation)"]
+        RawText --> Extractor{"Gemini API Key?"}
+        Extractor -->|Configured| LLM["Gemini 2.5 Flash<br/>Structured Schema"]
+        Extractor -->|Omitted / Offline| Rules["spaCy + Regex Engine<br/>Lemmas & DateParser"]
+        LLM --> Events["Extracted Temporal Events"]
         Rules --> Events
     end
 
     subgraph GraphEngine ["3. Temporal Event Graph"]
-        Events --> Anchor[Relative Time Anchor Resolution]
-        Anchor --> GraphBuilder[NetworkX Graph Builder]
-        GraphBuilder --> Transitive[Transitive Reduction & DAG Validation]
-        Transitive --> RelDB[(SQLite / PostgreSQL DB)]
+        Events --> Anchor["Relative Time Anchor Resolution"]
+        Anchor --> GraphBuilder["NetworkX Graph Builder"]
+        GraphBuilder --> Transitive["Transitive Reduction & DAG Validation"]
+        Transitive --> RelDB[("SQLite / PostgreSQL DB")]
     end
 
     subgraph WebApp ["4. REST API & UI"]
-        RelDB --> FastAPI[FastAPI REST API\nAsync Endpoints]
-        FastAPI --> ReactUI[React 19 + TypeScript Dashboard]
-        ReactUI --> GraphView[Interactive Network Graph Canvas]
-        ReactUI --> TimelineView[Chronological Timeline & Durations]
+        RelDB --> FastAPI["FastAPI REST API<br/>Async Endpoints"]
+        FastAPI --> ReactUI["React 19 + TypeScript Dashboard"]
+        ReactUI --> GraphView["Interactive Network Graph Canvas"]
+        ReactUI --> TimelineView["Chronological Timeline & Durations"]
     end
 ```
 
