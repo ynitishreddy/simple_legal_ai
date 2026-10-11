@@ -20,6 +20,12 @@ dependencies = [
     "uvicorn>=0.20.0",
     "python-multipart>=0.0.5",
     "google-generativeai>=0.8.0",
+    "pymupdf>=1.24.0",
+    "pdfplumber>=0.11.0",
+    "pypdf>=5.0.0",
+    "pdfminer.six>=20231228",
+    "pillow>=10.0.0",
+    "pytesseract>=0.3.10",
 ]
 
 [project.optional-dependencies]
