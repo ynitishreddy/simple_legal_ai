@@ -1,0 +1,75 @@
+services:
+  # ============================================================================
+  # Backend API Service (FastAPI + spaCy NLP + Graph Engine + SQLite)
+  # ============================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: simple_legal_ai_backend
+    restart: unless-stopped
+    expose:
+      - "8000"
+    environment:
+      - DATABASE_URL=sqlite:////app/data/legal_timeline.db
+      - UPLOAD_DIR=/app/uploads
+      - APP_ENV=production
+      - LOG_LEVEL=INFO
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_REGION=${AWS_REGION:-ap-south-1}
+      - S3_BUCKET=${S3_BUCKET:-indian-high-court-judgments}
+      - S3_PREFIX=${S3_PREFIX:-raw/}
+      - CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080,http://localhost:5173,http://localhost:3000
+    volumes:
+      - sqlite_data:/app/data
+      - uploaded_documents:/app/uploads
+    networks:
+      - simple_legal_ai_net
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/')\" || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # ============================================================================
+  # Frontend UI Service (React 19 + TypeScript + Vite + Nginx Reverse Proxy)
+  # ============================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: simple_legal_ai_frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - simple_legal_ai_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:80/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+# ==============================================================================
+# Persistent Named Volumes
+# ==============================================================================
+volumes:
+  sqlite_data:
+    name: simple_legal_ai_sqlite_data
+  uploaded_documents:
+    name: simple_legal_ai_uploaded_documents
+
+# ==============================================================================
+# Isolated Bridge Network
+# ==============================================================================
+networks:
+  simple_legal_ai_net:
+    name: simple_legal_ai_network
+    driver: bridge

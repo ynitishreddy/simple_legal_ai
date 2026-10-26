@@ -22,6 +22,7 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
+from config import settings
 from db.base import get_db
 from db.models import Case, CaseStatus, Event, TemporalRelation
 from nlp.pipeline import run_nlp_pipeline
@@ -70,8 +71,12 @@ async def analyze_file(
     page_count = 0
     extracted_text = ""
     
-    # Create temp directory in backend/temp if it doesn't exist
-    temp_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "temp")
+    # Create temp directory for file parsing
+    temp_dir = (
+        os.path.join(settings.upload_dir, "temp")
+        if hasattr(settings, "upload_dir") and settings.upload_dir
+        else os.path.join(os.path.dirname(os.path.dirname(__file__)), "temp")
+    )
     os.makedirs(temp_dir, exist_ok=True)
     temp_file_path = os.path.join(temp_dir, f"{uuid.uuid4()}_{file_name}")
 
@@ -203,12 +208,16 @@ async def upload_case(
                 detail="Unsupported file type. Only PDF, TXT, and JSON files are allowed."
             )
 
-        temp_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "temp")
-        os.makedirs(temp_dir, exist_ok=True)
-        temp_file_path = os.path.join(temp_dir, f"{uuid.uuid4()}_{filename}")
+        upload_dir = (
+            settings.upload_dir
+            if hasattr(settings, "upload_dir") and settings.upload_dir
+            else os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
+        )
+        os.makedirs(upload_dir, exist_ok=True)
+        saved_file_path = os.path.join(upload_dir, f"{uuid.uuid4()}_{filename}")
         try:
             bytes_content = await file.read()
-            with open(temp_file_path, "wb") as f:
+            with open(saved_file_path, "wb") as f:
                 f.write(bytes_content)
                 
             if filename.lower().endswith(".pdf"):
@@ -231,13 +240,12 @@ async def upload_case(
                 # Deduce citation from filename (without extension)
                 citation = filename.rsplit(".", 1)[0]
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Failed to read/parse file: {e}")
-        finally:
-            if os.path.exists(temp_file_path):
+            if os.path.exists(saved_file_path):
                 try:
-                    os.remove(temp_file_path)
+                    os.remove(saved_file_path)
                 except Exception as clean_err:
-                    logger.warning("Failed to remove temp file %s: %s", temp_file_path, clean_err)
+                    logger.warning("Failed to remove file %s: %s", saved_file_path, clean_err)
+            raise HTTPException(status_code=400, detail=f"Failed to read/parse file: {e}")
     # 2. Handle raw text parameter
     elif raw_text:
         content = raw_text

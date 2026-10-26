@@ -18,6 +18,7 @@ Design decisions
 
 from __future__ import annotations
 
+import os
 from contextlib import contextmanager
 from typing import Generator
 
@@ -50,6 +51,13 @@ def _make_engine() -> Engine:
     if is_sqlite:
         # SQLite does not support multi-thread by default.
         kwargs["connect_args"] = {"check_same_thread": False}
+
+        # Ensure parent directory exists for SQLite database file
+        db_file = settings.database_url.replace("sqlite:///", "")
+        if db_file and db_file != ":memory:":
+            db_dir = os.path.dirname(os.path.abspath(db_file))
+            if db_dir:
+                os.makedirs(db_dir, exist_ok=True)
 
     eng = create_engine(
         settings.database_url,

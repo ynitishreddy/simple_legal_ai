@@ -1,0 +1,46 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Local databases (use persistent volumes instead)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Environment secrets and credentials
+.env
+.env.*
+!.env.example
+
+# Temporary and local upload files
+temp/*
+!temp/.gitkeep
+uploads/*
+!uploads/.gitkeep
+
+# Git and version control
+.git/
+.gitignore
+
+# IDE and OS metadata
+.vscode/
+.idea/
+*.log
+.DS_Store
+Thumbs.db

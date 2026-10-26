@@ -46,10 +46,20 @@ class Settings(BaseSettings):
     )
     s3_prefix: str = Field(default="raw/", description="Key prefix for judgment objects")
 
+    # ── Storage & Uploads ─────────────────────────────────────────────────────
+    upload_dir: str = Field(
+        default="./uploads",
+        description="Directory for persisting uploaded PDF and document files",
+    )
+
     # ── Application ───────────────────────────────────────────────────────────
     app_env: str = Field(default="development", description="Deployment environment")
     log_level: str = Field(default="INFO", description="Python logging level")
     gemini_api_key: str = Field(default="", description="Gemini API Key for structured extraction")
+    cors_origins: str = Field(
+        default="http://localhost:3000,http://localhost:5173,http://localhost:8000,http://localhost:8080,http://127.0.0.1:3000,http://127.0.0.1:5173,http://127.0.0.1:8000,http://127.0.0.1:8080",
+        description="Comma-separated list of allowed CORS origins",
+    )
 
 
 # Singleton instance – import this everywhere instead of re-instantiating.

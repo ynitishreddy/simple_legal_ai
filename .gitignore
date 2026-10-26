@@ -15,3 +15,6 @@
 .env
 .DS_Store
 .agents/
+docker-compose.override.yml
+backend/uploads/
+backend/temp/

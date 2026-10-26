@@ -62,15 +62,25 @@ app = FastAPI(
 
 # ── CORS Middleware ───────────────────────────────────────────────────────────
 
-# Permit requests from standard web app framework development servers
-origins = [
+# Permit requests from standard web app framework development servers and Docker frontend
+default_origins = [
     "http://localhost:3000",      # React (Create React App)
     "http://localhost:5173",      # Vite (React/Vue/Svelte)
     "http://localhost:8000",      # Swagger/Self
+    "http://localhost:8080",      # Docker Compose frontend
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:8000",
+    "http://127.0.0.1:8080",
 ]
+
+configured_origins = [
+    origin.strip()
+    for origin in settings.cors_origins.split(",")
+    if origin.strip()
+] if hasattr(settings, "cors_origins") and settings.cors_origins else []
+
+origins = list(dict.fromkeys(default_origins + configured_origins))
 
 app.add_middleware(
     CORSMiddleware,

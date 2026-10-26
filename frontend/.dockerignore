@@ -1,0 +1,24 @@
+# Local dependencies and build artifacts
+node_modules/
+dist/
+dist-ssr/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Git and version control
+.git/
+.gitignore
+
+# IDE and OS metadata
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.eslintcache
+.oxlintrc.json

@@ -26,6 +26,16 @@
   - [2. Backend Setup](#2-backend-setup)
   - [3. Frontend Setup](#3-frontend-setup)
 - [Running the Application](#-running-the-application)
+- [Docker Deployment](#-docker-deployment)
+  - [Prerequisites](#prerequisites)
+  - [Docker Architecture Overview](#docker-architecture-overview)
+  - [Quick Start: Build & Run](#quick-start-build--run)
+  - [Starting and Stopping Containers](#starting-and-stopping-containers)
+  - [Viewing Logs](#viewing-logs)
+  - [Rebuilding After Code Changes](#rebuilding-after-code-changes)
+  - [Accessing Frontend & API](#accessing-frontend--api)
+  - [Persistent Data Storage](#persistent-data-storage)
+  - [Troubleshooting & Common Issues](#troubleshooting--common-issues)
 - [Running Tests](#-running-tests)
 - [API Reference](#-api-reference)
 - [Environment Variables](#-environment-variables)
@@ -263,6 +273,194 @@ npm run dev
 
 ---
 
+## 🐳 Docker Deployment
+
+The entire Simple Legal AI application is fully containerized using **Docker** and **Docker Compose**, providing a single-command setup with zero manual environment configuration.
+
+### Prerequisites
+
+1. **Docker Desktop** (version 24.0+ recommended) or **Docker Engine & Docker Compose v2**:
+   - [Install Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/) (requires WSL 2)
+   - [Install Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/)
+   - [Install Docker on Linux](https://docs.docker.com/engine/install/)
+2. Ensure the Docker daemon is running:
+   ```bash
+   docker --version
+   docker compose version
+   ```
+
+### Docker Architecture Overview
+
+```mermaid
+flowchart TD
+    User["Web Browser"] -->|http://localhost:8080| Nginx["Frontend Container (Nginx Alpine)"]
+    
+    subgraph FrontendService ["Frontend Service (:8080)"]
+        Nginx -->|Serves Static Files| ReactSPA["React 19 + Vite Production Bundle"]
+        Nginx -->|Reverse Proxy /api/*| BackendAPI
+        Nginx -->|Reverse Proxy /docs| BackendAPI
+    end
+
+    subgraph BackendService ["Backend Service (Internal Network :8000)"]
+        BackendAPI["FastAPI App (Uvicorn)"]
+        BackendAPI --> OCR["Tesseract OCR Engine"]
+        BackendAPI --> SpacyNLP["spaCy en_core_web_sm + Regex"]
+        BackendAPI --> Graph["NetworkX Temporal DAG Builder"]
+    end
+
+    subgraph Storage ["Persistent Named Volumes"]
+        BackendAPI --> VolDB[("sqlite_data Volume<br/>/app/data/legal_timeline.db")]
+        BackendAPI --> VolUpload[("uploaded_documents Volume<br/>/app/uploads/")]
+    end
+```
+
+- **Backend Container**:
+  - Base Image: `python:3.11-slim`
+  - Linux Packages: `tesseract-ocr`, `tesseract-ocr-eng` (for scanned PDF OCR fallback) and `curl`
+  - Pre-installed spaCy English model (`en_core_web_sm`)
+  - Automated schema initialization via `docker-entrypoint.sh`
+  - Runs FastAPI on Uvicorn bound to `0.0.0.0:8000`
+  - Only exposed to internal Docker bridge network (`simple_legal_ai_network`), keeping API protected
+- **Frontend Container**:
+  - Multi-stage build (`node:20-alpine` builder → `nginx:alpine` runner)
+  - Serves compiled React 19 production build with Gzip compression and client-side SPA routing (`try_files $uri $uri/ /index.html`)
+  - Configured with reverse proxy rules forwarding `/api/*` and `/docs` directly to the backend
+  - Configured with `client_max_body_size 50M` and 300s timeout to support large multi-page legal document uploads and OCR processing
+  - Exposed publicly on **`http://localhost:8080`**
+- **Persistent Storage**:
+  - `simple_legal_ai_sqlite_data`: Mounts to `/app/data` to persist `legal_timeline.db`
+  - `simple_legal_ai_uploaded_documents`: Mounts to `/app/uploads` to persist uploaded documents
+
+---
+
+### Quick Start: Build & Run
+
+From the root of the repository:
+
+**PowerShell / Command Prompt / Bash:**
+```bash
+# 1. Build container images and start services in detached mode
+docker compose up -d --build
+```
+
+Docker Compose will build both images, initialize database tables, seed sample cases if the database is fresh, and start services.
+
+---
+
+### Starting and Stopping Containers
+
+```bash
+# Start existing containers in detached mode:
+docker compose up -d
+
+# Stop running containers (preserves volume data):
+docker compose down
+
+# Stop containers AND delete persistent volumes (warning: wipes database):
+docker compose down -v
+```
+
+---
+
+### Viewing Logs
+
+```bash
+# Stream aggregated logs from all services:
+docker compose logs -f
+
+# View only backend logs:
+docker compose logs -f backend
+
+# View only frontend (Nginx) logs:
+docker compose logs -f frontend
+
+# View the last 100 log lines:
+docker compose logs --tail=100 backend
+```
+
+---
+
+### Rebuilding After Code Changes
+
+Whenever you modify Python backend code, frontend React components, or dependency files:
+
+```bash
+# Rebuild images without cache and restart services:
+docker compose up -d --build
+
+# Or rebuild a specific service:
+docker compose build backend
+docker compose up -d backend
+```
+
+---
+
+### Accessing Frontend & API
+
+Once running, access the services using your browser:
+
+- **Frontend Web Application**: [http://localhost:8080](http://localhost:8080)
+- **Interactive REST API Documentation (Swagger UI)**: [http://localhost:8080/docs](http://localhost:8080/docs)
+- **Alternative ReDoc API Documentation**: [http://localhost:8080/redoc](http://localhost:8080/redoc)
+- **Backend Health Check**: [http://localhost:8080/api/cases](http://localhost:8080/api/cases)
+
+---
+
+### Persistent Data Storage
+
+Data persistence is handled by Docker named volumes defined in `docker-compose.yml`:
+
+| Volume Name | Container Mount | Description |
+|---|---|---|
+| `simple_legal_ai_sqlite_data` | `/app/data` | Stores SQLite database (`legal_timeline.db`). Preserves ingested cases, extracted events, and temporal edges across restarts. |
+| `simple_legal_ai_uploaded_documents` | `/app/uploads` | Stores uploaded PDF/TXT/JSON files for permanent record retention. |
+
+To inspect stored volumes:
+```bash
+docker volume ls
+docker volume inspect simple_legal_ai_sqlite_data
+```
+
+To backup the SQLite database from the volume:
+```bash
+docker compose cp backend:/app/data/legal_timeline.db ./backup_legal_timeline.db
+```
+
+---
+
+### Troubleshooting & Common Issues
+
+#### 1. Port 8080 Already in Use
+If port 8080 is already occupied by another application, open `docker-compose.yml` and modify the frontend port mapping:
+```yaml
+ports:
+  - "8081:80"  # Changes external port to 8081
+```
+
+#### 2. Container Healthcheck Failing
+Check the exact container status:
+```bash
+docker compose ps
+docker compose logs backend
+```
+The frontend service waits for the backend to pass its health check (`/` returning HTTP 200). On initial startup, backend initialization and spaCy model loading takes approximately 10-20 seconds.
+
+#### 3. Uploaded Scanned PDFs Not Producing Text
+Verify that Tesseract OCR is available inside the backend container:
+```bash
+docker compose exec backend tesseract --version
+```
+The Dockerfile installs `tesseract-ocr` and `tesseract-ocr-eng` automatically.
+
+#### 4. Resetting to Fresh Database
+To clear all data and have the backend re-seed the initial sample judgments:
+```bash
+docker compose down -v
+docker compose up -d
+```
+
+---
+
 ## 🧪 Running Tests
 
 The test suite covers schema validation, database CRUD, mock S3 ingestion, regex/LLM NLP extraction, date normalization, graph construction, and FastAPI REST endpoints.
@@ -331,8 +529,12 @@ All settings can be specified via `backend/.env` or system environment variables
 ```
 simple_legal_ai/
 ├── README.md                          # Root project documentation (this file)
+├── docker-compose.yml                 # Multi-container orchestration (Frontend + Backend)
 │
 ├── backend/                           # FastAPI + NLP + Graph backend
+│   ├── Dockerfile                     # Python 3.11 + Tesseract OCR + spaCy production image
+│   ├── .dockerignore                  # Build context exclusions (venv, db, cache)
+│   ├── docker-entrypoint.sh           # DB schema initialization & startup script
 │   ├── README.md                      # Backend technical architecture & guide
 │   ├── main.py                        # FastAPI entry point & lifespan manager
 │   ├── config.py                      # Pydantic application settings
@@ -373,6 +575,9 @@ simple_legal_ai/
 │       └── test_api.py                # FastAPI endpoint integration tests
 │
 └── frontend/                          # React + TypeScript + Vite UI
+    ├── Dockerfile                     # Multi-stage build (Node 20 build -> Nginx Alpine)
+    ├── .dockerignore                  # Build context exclusions (node_modules, dist)
+    ├── nginx.conf                     # Nginx configuration (SPA routing & API reverse proxy)
     ├── README.md                      # Frontend-specific documentation
     ├── package.json                   # npm dependencies and scripts
     ├── vite.config.ts                 # Vite config with backend proxy (/api)
